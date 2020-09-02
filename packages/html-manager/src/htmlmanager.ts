@@ -29,14 +29,27 @@ class HTMLManager extends base.ManagerBase<HTMLElement> {
      * Display the specified view. Element where the view is displayed
      * is specified in the `options.el` argument.
      */
-    display_view(msg: any, view: any, options: { el: HTMLElement; }) {
-        return Promise.resolve(view).then((view) => {
-            PhosphorWidget.Widget.attach(view.pWidget, options.el);
-            view.on('remove', () => {
-                console.log('View removed', view);
+    async display_view(msg: any, view: any, options: { el: HTMLElement; }): Promise<any> {
+        let v: base.DOMWidgetView;
+
+        try {
+            v = await view;
+        } catch (error) {
+            const msg = `Could not create a view for ${view}`;
+            console.error(msg);
+            const ModelCls = base.createErrorWidgetModel(error, msg);
+            const errorModel = new ModelCls();
+            v = new base.ErrorWidgetView({
+                model: errorModel,
             });
-            return view;
+            v.render();
+        }
+
+        PhosphorWidget.Widget.attach(v.pWidget, options.el);
+        v.on('remove', () => {
+            console.log('View removed', v);
         });
+        return v;
     }
 
     /**

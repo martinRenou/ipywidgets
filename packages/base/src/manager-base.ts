@@ -9,6 +9,10 @@ import {
 } from './widget';
 
 import {
+  createErrorWidgetModel, createErrorWidgetView, ErrorWidgetView
+} from './errorwidget';
+
+import {
     IClassicComm, ICallbacks
 } from './services-shim';
 
@@ -162,26 +166,90 @@ abstract class ManagerBase<T> {
      */
     create_view(model: DOMWidgetModel, options: any): Promise<DOMWidgetView>;
     create_view(model: WidgetModel, options = {}): Promise<WidgetView> {
-        let viewPromise = model.state_change = model.state_change.then(() => {
-            return this.loadClass(model.get('_view_name'),
-                model.get('_view_module'),
-                model.get('_view_module_version')
-            ).then((ViewType: typeof WidgetView) => {
-                let view: WidgetView = new ViewType({
-                    model: model,
-                    options: this.setViewOptions(options)
-                });
-                view.listenTo(model, 'destroy', view.remove);
-                return Promise.resolve(view.render()).then(() => { return view; });
-            }).catch(utils.reject('Could not create a view for model id ' + model.model_id, true));
-        });
-        let id = utils.uuid();
+      let id = utils.uuid();
+
+        let viewPromise = (model.state_change = model.state_change.then(async () => {
+          const _view_name = model.get('_view_name');
+          const _view_module = model.get('_view_module');
+
+          try {
+            const ViewType = (await this.loadViewClass(
+              _view_name,
+              _view_module,
+              model.get('_view_module_version')
+            )) as typeof WidgetView;
+            const view = new ViewType({
+              model: model,
+              options: this.setViewOptions(options),
+            });
+            view.listenTo(model, 'destroy', view.remove);
+            await view.render();
+            // This presumes the view is added to the list of model views below
+            view.once('remove', () => {
+              if (model.views) {
+                delete model.views[id];
+              }
+            });
+            return view;
+          } catch (e) {
+            console.error(
+              `Could not create a view for model id ${model.model_id}`
+            );
+            const msg = `Failed to create view for '${_view_name}' from module '${_view_module}' with model '${model.name}' from module '${model.module}'`;
+            const ModelCls = createErrorWidgetModel(e, msg);
+            const errorModel = new ModelCls();
+            const view = new ErrorWidgetView({
+              model: errorModel,
+              options: this.setViewOptions(options),
+            });
+            await view.render();
+
+            return view;
+          }
+        }));
         model.views[id] = viewPromise;
-        viewPromise.then((view) => {
-            view.once('remove', () => { delete view.model.views[id]; }, this);
-        });
         return model.state_change;
     }
+
+    protected async loadViewClass(
+      className: string,
+      moduleName: string,
+      moduleVersion: string
+    ): Promise<typeof WidgetView> {
+      try {
+        const promise: Promise<typeof WidgetView> = this.loadClass(
+          className,
+          moduleName,
+          moduleVersion
+        ) as Promise<typeof WidgetView>;
+        await promise;
+        return promise;
+      } catch (error) {
+        console.error(error);
+        const msg = `Failed to load view class '${className}' from module '${moduleName}'`;
+        return createErrorWidgetView(error, msg);
+      }
+    }
+
+    protected async loadModelClass(
+      className: string,
+      moduleName: string,
+      moduleVersion: string
+    ): Promise<typeof WidgetModel> {
+      try {
+        const promise: Promise<typeof WidgetModel> = this.loadClass(
+          className,
+          moduleName,
+          moduleVersion
+        ) as Promise<typeof WidgetModel>;
+        await promise;
+        return promise;
+      } catch (error) {
+        console.error(error);
+        const msg = `Failed to load model class '${className}' from module '${moduleName}'`;
+        return createErrorWidgetModel(error, msg);
+    }
+  }
 
     /**
      * callback handlers specific to a view
@@ -334,30 +402,51 @@ abstract class ManagerBase<T> {
 
     async _make_model(options: ModelOptions, serialized_state: any = {}): Promise<WidgetModel> {
         let model_id = options.model_id;
-        let model_promise = this.loadClass(
+        let model_promise = this.loadModelClass(
             options.model_name,
             options.model_module,
             options.model_module_version
         ) as Promise<typeof WidgetModel>;
         let ModelType: typeof WidgetModel;
+
+        const makeErrorModel = (error: any, msg: string) => {
+          const Cls = createErrorWidgetModel(error, msg);
+          const widget_model = new Cls();
+          return widget_model;
+        };
         try {
             ModelType = await model_promise;
         } catch (error) {
-            console.error('Could not instantiate widget');
-            throw error;
+          const msg = 'Could not instantiate widget';
+          console.error(msg);
+          return makeErrorModel(error, msg);
         }
 
         if (!ModelType) {
-            throw new Error(`Cannot find model module ${options.model_module}@${options.model_module_version}, ${options.model_name}`);
+          const msg = 'Could not instantiate widget';
+          console.error(msg);
+          const error = new Error(`Cannot find model module ${options.model_module}@${options.model_module_version}, ${options.model_name}`);
+          return makeErrorModel(error, msg);
         }
 
-        let attributes = await ModelType._deserialize_state(serialized_state, this);
-        let modelOptions = {
+        let widget_model: WidgetModel;
+        try {
+          const attributes = await ModelType._deserialize_state(
+            serialized_state,
+            this
+          );
+          const modelOptions = {
             widget_manager: this,
             model_id: model_id,
             comm: options.comm,
-        };
-        let widget_model = new ModelType(attributes, modelOptions);
+          };
+
+          widget_model = new ModelType(attributes, modelOptions);
+        } catch (error) {
+          console.error(error);
+          const msg = `Model class '${options.model_name}' from module '${options.model_module}' is loaded but can not be instantiated`;
+          widget_model = makeErrorModel(error, msg);
+        }
         widget_model.name = options.model_name;
         widget_model.module = options.model_module;
         return widget_model;
