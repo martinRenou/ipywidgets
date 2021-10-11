@@ -25,8 +25,9 @@ from json import loads as jsonloads, dumps as jsondumps
 
 from base64 import standard_b64encode
 
-from .._version import __protocol_version__, __jupyter_widgets_base_version__
+from .._version import __protocol_version__, __control_protocol_version__, __jupyter_widgets_base_version__
 PROTOCOL_VERSION_MAJOR = __protocol_version__.split('.')[0]
+CONTROL_PROTOCOL_VERSION_MAJOR = __control_protocol_version__.split('.')[0]
 
 def _widget_to_json(x, obj):
     if isinstance(x, dict):
@@ -319,6 +320,10 @@ class Widget(LoggingHasTraits):
 
     @classmethod
     def handle_comm_opened_control(cls, comm, msg):
+        version = msg.get('metadata', {}).get('version', '')
+        if version.split('.')[0] != CONTROL_PROTOCOL_VERSION_MAJOR:
+            raise ValueError("Incompatible widget control protocol versions: received version %r, expected version %r"%(version, __control_protocol_version__))
+
         cls.get_manager_state()
         widgets = Widget.widgets.values()
         # build a single dict with the full widget state
@@ -332,10 +337,7 @@ class Widget(LoggingHasTraits):
                 'state': widget.get_state(drop_defaults=drop_defaults),
             }
         full_state, buffer_paths, buffers = _remove_buffers(full_state)
-        # the message is also send as buffer, so it does not get handled by jupyter_server
-        msg = jsondumps([full_state, buffer_paths]).encode('utf8')
-        buffers.insert(0, msg)
-        comm.send(buffers=buffers)
+        comm.send([full_state, buffer_paths], buffers=buffers)
 
     @staticmethod
     def handle_comm_opened(comm, msg):
