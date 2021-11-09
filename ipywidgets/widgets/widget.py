@@ -291,6 +291,7 @@ class Widget(LoggingHasTraits):
     # Class attributes
     #-------------------------------------------------------------------------
     _widget_construction_callback = None
+    _control_comm = None
 
     # widgets is a dictionary of all active widget objects
     widgets = {}
@@ -302,7 +303,6 @@ class Widget(LoggingHasTraits):
     def close_all(cls):
         for widget in list(cls.widgets.values()):
             widget.close()
-
 
     @staticmethod
     def on_widget_constructed(callback):
@@ -319,25 +319,37 @@ class Widget(LoggingHasTraits):
             Widget._widget_construction_callback(widget)
 
     @classmethod
-    def handle_comm_opened_control(cls, comm, msg):
+    def handle_control_comm_opened(cls, comm, msg):
         version = msg.get('metadata', {}).get('version', '')
         if version.split('.')[0] != CONTROL_PROTOCOL_VERSION_MAJOR:
             raise ValueError("Incompatible widget control protocol versions: received version %r, expected version %r"%(version, __control_protocol_version__))
 
-        cls.get_manager_state()
-        widgets = Widget.widgets.values()
-        # build a single dict with the full widget state
-        full_state = {}
-        drop_defaults = False
-        for widget in widgets:
-            full_state[widget.model_id] = {
-                'model_name': widget._model_name,
-                'model_module': widget._model_module,
-                'model_module_version': widget._model_module_version,
-                'state': widget.get_state(drop_defaults=drop_defaults),
-            }
-        full_state, buffer_paths, buffers = _remove_buffers(full_state)
-        comm.send([full_state, buffer_paths], buffers=buffers)
+        cls._control_comm = comm
+        cls._control_comm.on_msg(cls.handle_control_comm_msg)
+
+    @classmethod
+    def handle_control_comm_msg(cls, msg):
+        # This shouldn't happen unless someone calls this method manually
+        if cls._control_comm is None:
+            raise RuntimeError('Control comm has not been properly opened')
+
+        if msg['content']['data']['type'] == 'models-request':
+            # Send back the full widgets state
+            cls.get_manager_state()
+            widgets = Widget.widgets.values()
+            full_state = {}
+            drop_defaults = False
+            for widget in widgets:
+                full_state[widget.model_id] = {
+                    'model_name': widget._model_name,
+                    'model_module': widget._model_module,
+                    'model_module_version': widget._model_module_version,
+                    'state': widget.get_state(drop_defaults=drop_defaults),
+                }
+            full_state, buffer_paths, buffers = _remove_buffers(full_state)
+            cls._control_comm.send([full_state, buffer_paths], buffers=buffers)
+        else:
+            raise RuntimeError('Control comm msg "{}" not implemented'.format(msg['content']['data']['type']))
 
     @staticmethod
     def handle_comm_opened(comm, msg):

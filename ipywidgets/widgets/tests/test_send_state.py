@@ -29,5 +29,6 @@ def test_control():
     comm = DummyComm()
     Widget.close_all()
     w = SimpleWidget()
-    Widget.handle_comm_opened_control(comm, {})
+    Widget.handle_control_comm_opened(comm, {})
+    Widget.handle_control_comm_msg({'type': 'models-request'})
     assert comm.messages

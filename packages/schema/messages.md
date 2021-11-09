@@ -348,4 +348,6 @@ This is implemented in ipywidgets 7.7.
 
 ### The `jupyter.widget.control` comm target
 
-A kernel-side Jupyter widgets library registers a `jupyter.widget.control` comm target that is used for fetching all widgets states through a "one shot" comm message (one for all widget instances). The kernel-side widgets library must answer to the "comm-open" message with a comm message containing the full state of all widget instances.
+A kernel-side Jupyter widgets library registers a `jupyter.widget.control` comm target that is used for fetching all widgets states through a "one shot" comm message (one for all widget instances).
+
+The kernel-side widgets library must answer to the `{"type": "models-request"}` message with a comm message containing the full state of all widget instances.
