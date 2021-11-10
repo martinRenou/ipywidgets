@@ -363,13 +363,13 @@ When a frontend wants to request the full state of a all widgets, the frontend s
 }
 ```
 
-The kernel side of the widget should immediately send an `states` message with all widgets states:
+The kernel side of the widget should immediately send an `update_states` message with all widgets states:
 
 ```
 {
   'comm_id' : 'u-u-i-d',
   'data' : {
-    'method': 'states',
+    'method': 'update_states',
     'states': {
       <widget1 u-u-i-d>: <widget1 state>,
       <widget2 u-u-i-d>: <widget2 state>,

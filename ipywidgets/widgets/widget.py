@@ -320,15 +320,19 @@ class Widget(LoggingHasTraits):
 
     @classmethod
     def handle_control_comm_opened(cls, comm, msg):
+        """
+        Class method, called when the comm-open message on the
+        "jupyter.widget.control" comm channel is received
+        """
         version = msg.get('metadata', {}).get('version', '')
         if version.split('.')[0] != CONTROL_PROTOCOL_VERSION_MAJOR:
             raise ValueError("Incompatible widget control protocol versions: received version %r, expected version %r"%(version, __control_protocol_version__))
 
         cls._control_comm = comm
-        cls._control_comm.on_msg(cls.handle_control_comm_msg)
+        cls._control_comm.on_msg(cls._handle_control_comm_msg)
 
     @classmethod
-    def handle_control_comm_msg(cls, msg):
+    def _handle_control_comm_msg(cls, msg):
         # This shouldn't happen unless someone calls this method manually
         if cls._control_comm is None:
             raise RuntimeError('Control comm has not been properly opened')
@@ -339,7 +343,7 @@ class Widget(LoggingHasTraits):
         if method == 'request_states':
             # Send back the full widgets state
             cls.get_manager_state()
-            widgets = Widget.widgets.values()
+            widgets = cls.widgets.values()
             full_state = {}
             drop_defaults = False
             for widget in widgets:
@@ -351,7 +355,7 @@ class Widget(LoggingHasTraits):
                 }
             full_state, buffer_paths, buffers = _remove_buffers(full_state)
             cls._control_comm.send(dict(
-                method='states',
+                method='update_states',
                 states=full_state,
                 buffer_paths=buffer_paths
             ), buffers=buffers)
