@@ -333,7 +333,10 @@ class Widget(LoggingHasTraits):
         if cls._control_comm is None:
             raise RuntimeError('Control comm has not been properly opened')
 
-        if msg['content']['data']['type'] == 'models-request':
+        data = msg['content']['data']
+        method = data['method']
+
+        if method == 'request_states':
             # Send back the full widgets state
             cls.get_manager_state()
             widgets = Widget.widgets.values()
@@ -347,9 +350,14 @@ class Widget(LoggingHasTraits):
                     'state': widget.get_state(drop_defaults=drop_defaults),
                 }
             full_state, buffer_paths, buffers = _remove_buffers(full_state)
-            cls._control_comm.send([full_state, buffer_paths], buffers=buffers)
+            cls._control_comm.send(dict(
+                method='states',
+                states=full_state,
+                buffer_paths=buffer_paths
+            ), buffers=buffers)
+
         else:
-            raise RuntimeError('Control comm msg "{}" not implemented'.format(msg['content']['data']['type']))
+            self.log.error('Unknown front-end to back-end widget control msg with method "%s"' % method)
 
     @staticmethod
     def handle_comm_opened(comm, msg):

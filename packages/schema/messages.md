@@ -348,6 +348,34 @@ This is implemented in ipywidgets 7.7.
 
 ### The `jupyter.widget.control` comm target
 
-A kernel-side Jupyter widgets library registers a `jupyter.widget.control` comm target that is used for fetching all widgets states through a "one shot" comm message (one for all widget instances).
+A kernel-side Jupyter widgets library registers a `jupyter.widget.control` comm target that is used for fetching all widgets states through a "one shot" comm message (one for all widget instances). Unlike the `jupyter.widget` comm target, the created comm is global to all widgets,
 
-The kernel-side widgets library must answer to the `{"type": "models-request"}` message with a comm message containing the full state of all widget instances.
+#### State requests: `request_states`
+
+When a frontend wants to request the full state of a all widgets, the frontend sends a `request_states` message:
+
+```
+{
+  'comm_id' : 'u-u-i-d',
+  'data' : {
+    'method': 'request_states'
+  }
+}
+```
+
+The kernel side of the widget should immediately send an `states` message with all widgets states:
+
+```
+{
+  'comm_id' : 'u-u-i-d',
+  'data' : {
+    'method': 'states',
+    'states': {
+      <widget1 u-u-i-d>: <widget1 state>,
+      <widget2 u-u-i-d>: <widget2 state>,
+      [...]
+    },
+    'buffer_paths': [ <list with paths corresponding to the binary buffers> ]
+  }
+}
+```
