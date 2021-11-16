@@ -4,6 +4,7 @@
 // Here we generate the /dist files that allow widget embedding
 
 var path = require('path');
+var webpack = require('webpack');
 
 var version = require('./package.json').version;
 
@@ -48,6 +49,17 @@ var rules = [
 
 var publicPath = 'https://unpkg.com/@jupyter-widgets/html-manager@' + version + '/dist/';
 
+var plugins = [
+  new webpack.DefinePlugin({
+    // Needed for Blueprint. See https://github.com/palantir/blueprint/issues/4393
+    'process.env': '{}',
+    // Needed for various packages using cwd(), like the path polyfill
+    'process.cwd': '() => "/"',
+    // Needed for various packages using argv(), like JupyterLab's getOption function
+    'process.argv': '[]',
+  }),
+];
+
 module.exports = [
 {// script that renders widgets using the standard embedding and can only render standard controls
     entry: './lib/embed.js',
@@ -58,7 +70,8 @@ module.exports = [
     },
     devtool: 'source-map',
     module: { rules: rules },
-    mode: 'production'
+    mode: 'production',
+    plugins: plugins,
 },
 {// script that renders widgets using the amd embedding and can render third-party custom widgets
     entry: './lib/embed-amd-render.js',
@@ -68,7 +81,8 @@ module.exports = [
         publicPath: publicPath,
     },
     module: { rules: rules },
-    mode: 'production'
+    mode: 'production',
+    plugins: plugins,
 },
 {// embed library that depends on requirejs, and can load third-party widgets dynamically
     entry: './lib/libembed-amd.js',
@@ -80,7 +94,8 @@ module.exports = [
         libraryTarget: 'amd'
     },
     module: { rules: rules },
-    mode: 'production'
+    mode: 'production',
+    plugins: plugins,
 },
 {// @jupyter-widgets/html-manager
     entry: './lib/index.js',
@@ -93,7 +108,8 @@ module.exports = [
     },
     module: { rules: rules },
     externals: ['@jupyter-widgets/base', '@jupyter-widgets/controls'],
-    mode: 'production'
+    mode: 'production',
+    plugins: plugins,
 },
 {// @jupyter-widgets/base
     entry: '@jupyter-widgets/base/lib/index',
@@ -105,7 +121,8 @@ module.exports = [
         libraryTarget: 'amd',
     },
     module: { rules: rules },
-    mode: 'production'
+    mode: 'production',
+    plugins: plugins,
 },
 {// @jupyter-widgets/controls
     entry: '@jupyter-widgets/controls/lib/index',
@@ -118,6 +135,7 @@ module.exports = [
     },
     module: { rules: rules },
     externals: ['@jupyter-widgets/base'],
-    mode: 'production'
+    mode: 'production',
+    plugins: plugins,
 }
 ];
