@@ -100,8 +100,8 @@ abstract class BaseIntSliderView extends DescriptionView {
         super.render();
         this.el.classList.add('jupyter-widgets');
         this.el.classList.add('widget-inline-hbox');
-        this.el.classList.add('widget-slider');
-        this.el.classList.add('widget-hslider');
+        this.el.classList.add('widget7-slider');
+        this.el.classList.add('widget7-hslider');
 
         (this.$slider = $('<div />') as any)
             .slider({
@@ -175,13 +175,13 @@ abstract class BaseIntSliderView extends DescriptionView {
 
             // Use the right CSS classes for vertical & horizontal sliders
             if (orientation==='vertical') {
-                this.el.classList.remove('widget-hslider');
-                this.el.classList.add('widget-vslider');
+                this.el.classList.remove('widget7-hslider');
+                this.el.classList.add('widget7-vslider');
                 this.el.classList.remove('widget-inline-hbox');
                 this.el.classList.add('widget-inline-vbox');
             } else {
-                this.el.classList.remove('widget-vslider');
-                this.el.classList.add('widget-hslider');
+                this.el.classList.remove('widget7-vslider');
+                this.el.classList.add('widget7-hslider');
                 this.el.classList.remove('widget-inline-vbox');
                 this.el.classList.add('widget-inline-hbox');
             }
